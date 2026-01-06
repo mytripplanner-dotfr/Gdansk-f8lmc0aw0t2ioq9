@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Voyage - Gdansk</title>
+  <style>
+    :root { --primary: #1a73e8; --bg-sidebar: #ffffff; }
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Arial, sans-serif; display: flex; height: 100vh; height: 100dvh; overflow: hidden; color: #333; }
+    #sidebar { width: 400px; background: var(--bg-sidebar); height: 100%; display: flex; flex-direction: column; box-shadow: 4px 0 15px rgba(0,0,0,0.08); z-index: 10; transition: 0.3s ease; }
+    #map { flex: 1; height: 100%; position: relative; }
+    
+    .sidebar-header { padding: 10px 15px; border-bottom: 1px solid #eee; background: #fff; flex-shrink: 0; }
+    .filter-group { display: flex; overflow-x: auto; white-space: nowrap; gap: 8px; padding: 5px 0 10px 0; scrollbar-width: none; }
+    .filter-btn { padding: 8px 16px; border: 1px solid #dfe1e5; border-radius: 20px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .step-nav { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+    .step-badge { padding: 6px 12px; border-radius: 15px; font-size: 11px; font-weight: 700; background: #f1f3f4; color: #5f6368; cursor: pointer; white-space: nowrap; border: 1px solid transparent; }
+    .step-badge.active { background: #e8f0fe; color: var(--primary); border-color: var(--primary); }
+
+    #poi-content { flex-grow: 1; overflow-y: auto; position: relative; }
+    .poi-detail { display: flex; flex-direction: column; min-height: 100%; }
+    .close-details { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; z-index: 20; font-size: 20px; }
+    .poi-image { width: 100%; height: 230px; object-fit: cover; background: #eee; }
+    .poi-body { padding: 20px; flex-grow: 1; }
+    .poi-body h2 { margin: 0 0 10px 0; font-size: 20px; line-height: 1.3; }
+    
+    .badge-container { margin-bottom: 10px; }
+    .badge { display: inline-block; background: #f1f3f4; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 5px; }
+    .badge-day { background: #e8f0fe; color: var(--primary); }
+    
+    .btn-group { display: flex; gap: 10px; padding: 15px 20px; background: #fff; border-top: 1px solid #f0f0f0; position: sticky; bottom: 0; }
+    .btn { flex: 1; text-align: center; padding: 12px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; }
+    .btn-main { background: var(--primary); color: white; }
+    .btn-outline { border: 1px solid #dadce0; color: #1a73e8; }
+    .placeholder { padding: 40px 20px; text-align: center; color: #70757a; font-size: 14px; }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column-reverse; }
+      #sidebar { width: 100%; max-height: 55%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="filter-group" id="day-filters">
+        <button class="filter-btn active" onclick="filterByDay('all', this)">Toutes</button>
+      </div>
+    </div>
+    <div id="poi-content">
+      <div class="placeholder">Sélectionnez une journée pour explorer les étapes.</div>
+    </div>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+  <script>
+    let map, markerCluster;
+    let markersArray = [];
+    let initialCenter, initialZoom;
+    const locations = [{"lat":54.3483269,"lng":18.6540422,"name":"Długi Targ, Gdansk","jour":2,"titre":"","type":"place historique","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3483269,18.6540422&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3483269,18.6540422"},{"lat":54.3485459,"lng":18.6532258,"name":"Fontanna Neptuna, Gdansk","jour":2,"titre":"","type":"monument","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3485459,18.6532258&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3485459,18.6532258"},{"lat":54.34879189999999,"lng":18.653381,"name":"Artus Court, Gdansk","jour":2,"titre":"","type":"bâtiment historique","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.34879189999999,18.653381&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.34879189999999,18.653381"},{"lat":54.3496106,"lng":18.6554812,"name":"Ulica Mariacka, Gdansk","jour":2,"titre":"","type":"rue historique","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3496106,18.6554812&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3496106,18.6554812"},{"lat":54.3498001,"lng":18.6531641,"name":"Bazylika Mariacka, Gdansk","jour":3,"titre":"","type":"église","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3498001,18.6531641&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3498001,18.6531641"},{"lat":54.3361274,"lng":18.6799674,"name":"Żuraw, Gdansk","jour":3,"titre":"","type":"monument historique","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3361274,18.6799674&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3361274,18.6799674"},{"lat":54.35089900000001,"lng":18.659019,"name":"National Maritime Museum, Gdansk","jour":3,"titre":"","type":"musée","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.35089900000001,18.659019&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.35089900000001,18.659019"},{"lat":54.361313,"lng":18.64974,"name":"Europejskie Centrum Solidarności, Gdansk","jour":4,"titre":"","type":"musée","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.361313,18.64974&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.361313,18.64974"},{"lat":54.3560788,"lng":18.6599927,"name":"Muzeum II Wojny Światowej, Gdansk","jour":4,"titre":"","type":"musée","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3560788,18.6599927&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3560788,18.6599927"},{"lat":54.4109789,"lng":18.5580156,"name":"Archikatedra Oliwska, Gdansk","jour":5,"titre":"","type":"cathédrale","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.4109789,18.5580156&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.4109789,18.5580156"},{"lat":54.4112209,"lng":18.5620805,"name":"Park Oliwski, Gdansk","jour":5,"titre":"","type":"parc","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.4112209,18.5620805&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.4112209,18.5620805"},{"lat":54.446506,"lng":18.5720474,"name":"Molo w Sopocie, Sopot","jour":6,"titre":"","type":"jetée","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.446506,18.5720474&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.446506,18.5720474"},{"lat":54.4441956,"lng":18.5667476,"name":"Krzywy Domek, Sopot","jour":6,"titre":"","type":"architecture","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.4441956,18.5667476&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.4441956,18.5667476"},{"lat":54.51956569999999,"lng":18.5509422,"name":"ORP Błyskawica, Gdynia","jour":7,"titre":"","type":"musée naval","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.51956569999999,18.5509422&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.51956569999999,18.5509422"},{"lat":54.5193251,"lng":18.552593,"name":"Dar Pomorza, Gdynia","jour":7,"titre":"","type":"musée naval","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.5193251,18.552593&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.5193251,18.552593"},{"lat":54.5184362,"lng":18.5578212,"name":"Akwarium Gdyńskie, Gdynia","jour":7,"titre":"","type":"aquarium","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.5184362,18.5578212&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.5184362,18.5578212"},{"lat":54.4336634,"lng":18.5835636,"name":"Sopot Marriott Resort & Spa, Sopot","jour":8,"titre":"","type":"spa","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.4336634,18.5835636&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.4336634,18.5835636"},{"lat":54.35202520000001,"lng":18.6466384,"name":"Gdansk Cooking Class, Gdansk","jour":8,"titre":"","type":"activité culinaire","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.35202520000001,18.6466384&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.35202520000001,18.6466384"},{"lat":54.3454255,"lng":18.6468929,"name":"Muzeum Narodowe w Gdańsku, Gdansk","jour":9,"titre":"","type":"musée d'art","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3454255,18.6468929&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3454255,18.6468929"},{"lat":54.344842,"lng":18.655074,"name":"Muzeum Archeologiczne w Gdańsku, Gdansk","jour":9,"titre":"","type":"musée archéologique","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.344842,18.655074&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.344842,18.655074"},{"lat":54.4068545,"lng":18.6694618,"name":"Westerplatte, Gdansk","jour":10,"titre":"","type":"site historique","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.4068545,18.6694618&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.4068545,18.6694618"},{"lat":54.3925773,"lng":18.5959231,"name":"Zaspa Murals, Gdansk","jour":10,"titre":"","type":"art urbain","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3925773,18.5959231&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3925773,18.5959231"},{"lat":54.0397526,"lng":19.0280127,"name":"Zamek w Malborku, Malbork","jour":11,"titre":"","type":"château","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.0397526,19.0280127&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.0397526,19.0280127"},{"lat":54.3527801,"lng":18.6525331,"name":"Hala Targowa, Gdansk","jour":12,"titre":"","type":"marché","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3527801,18.6525331&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3527801,18.6525331"},{"lat":54.35012039999999,"lng":18.6512634,"name":"Browar Piwna, Gdansk","jour":13,"titre":"","type":"brasserie","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.35012039999999,18.6512634&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.35012039999999,18.6512634"},{"lat":54.3754013,"lng":18.6091245,"name":"Wrzeszcz, Gdansk","jour":15,"titre":"","type":"quartier","markerColor":"blue","streetViewUrl":"https://maps.googleapis.com/maps/api/streetview?size=600x400&location=54.3754013,18.6091245&key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI","streetViewLinkUrl":"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=54.3754013,18.6091245"}];
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        zoomControl: true,
+        streetViewControl: false,
+        mapTypeControl: false,
+        styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
+      });
+
+      const days = [...new Set(locations.map(l => l.jour))].sort((a,b) => a - b);
+      const filterContainer = document.getElementById('day-filters');
+      days.forEach(day => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-btn';
+        btn.innerText = 'Jour ' + day;
+        btn.onclick = function() { filterByDay(day, this); };
+        filterContainer.appendChild(btn);
+      });
+
+      const bounds = new google.maps.LatLngBounds();
+      locations.forEach((loc, index) => {
+        const marker = new google.maps.Marker({
+          position: { lat: loc.lat, lng: loc.lng },
+          // URL corrigée pour les icônes
+          icon: 'https://maps.google.com/mapfiles/ms/icons/' + loc.markerColor + '-dot.png',
+          label: { text: String(loc.jour), color: 'white', fontSize: '11px', fontWeight: 'bold' },
+          data: loc
+        });
+        marker.addListener('click', () => updateSidebar(loc));
+        markersArray.push(marker);
+        bounds.extend(marker.getPosition());
+      });
+
+      markerCluster = new markerClusterer.MarkerClusterer({ map, markers: markersArray });
+
+      if (locations.length > 0) {
+        map.fitBounds(bounds);
+        google.maps.event.addListenerOnce(map, 'idle', () => {
+          if (map.getZoom() > 14) map.setZoom(14);
+          initialCenter = map.getCenter();
+          initialZoom = map.getZoom();
+        });
+      }
+    }
+
+    function updateSidebar(poi) {
+      const container = document.getElementById('poi-content');
+      const daySteps = locations.filter(l => l.jour === poi.jour);
+      let stepHtml = '';
+      
+      if (daySteps.length > 1) {
+        stepHtml = '<div class="step-nav">';
+        daySteps.forEach((step, idx) => {
+          const active = (step.name === poi.name && step.lat === poi.lat) ? 'active' : '';
+          const locIdx = locations.findIndex(l => l === step);
+          stepHtml += `<div class="step-badge ${active}" onclick="updateSidebarByIndex(${locIdx})">Étape ${idx + 1}</div>`;
+        });
+        stepHtml += '</div>';
+      }
+
+      container.innerHTML = `
+        <div class="poi-detail">
+          <button class="close-details" onclick="closeSidebar()">✕</button>
+          <img src="${poi.streetViewUrl}" class="poi-image" onerror="this.style.display='none'">
+          <div class="poi-body">
+            ${stepHtml}
+            <div class="badge-container">
+              <span class="badge badge-day">Jour ${poi.jour}</span>
+              <span class="badge">${poi.type}</span>
+            </div>
+            <h2>${poi.name}</h2>
+            <p>${poi.titre}</p>
+          </div>
+          <div class="btn-group">
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}" target="_blank" class="btn btn-main">Itinéraire</a>
+            <a href="${poi.streetViewLinkUrl}" target="_blank" class="btn btn-outline">Street View</a>
+          </div>
+        </div>
+      `;
+      
+      // Déplacement et zoom unique ici
+      map.panTo({ lat: poi.lat, lng: poi.lng });
+      map.setZoom(14);
+      container.scrollTop = 0;
+    }
+
+    window.updateSidebarByIndex = function(index) {
+      updateSidebar(locations[index]);
+    };
+
+    function filterByDay(day, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filteredMarkers = day === 'all' ? markersArray : markersArray.filter(m => m.data.jour === day);
+      markerCluster.clearMarkers();
+      markerCluster.addMarkers(filteredMarkers);
+
+      if (day === 'all') {
+        map.setCenter(initialCenter);
+        map.setZoom(initialZoom);
+        closeSidebar();
+      } else if (filteredMarkers.length > 0) {
+        // Appelle la sidebar pour le premier point, qui gère aussi le panTo/zoom
+        updateSidebar(filteredMarkers[0].data);
+      }
+    }
+
+    function closeSidebar() {
+      document.getElementById('poi-content').innerHTML = '<div class="placeholder">Sélectionnez une journée pour explorer les étapes.</div>';
+    }
+  </script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB5WUNvRC9eOjHRLt92fs4hsp0Auje3aAI&callback=initMap"></script>
+</body>
+</html>
